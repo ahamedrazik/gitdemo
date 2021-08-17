@@ -1,0 +1,73 @@
+AWSTemplateFormatVersion: 2010-09-09
+
+Mappings:
+  RegionMap:
+    us-east-1:
+      HVM64: ami-0c2b8ca1dad447f8a 
+    us-east-2:
+      HVM64: ami-0233c2d874b811deb
+  MyEnvironmentMap:
+    dev:
+      instanceType: t2.micro 
+    prod:    
+      instanceType: t2.small
+      
+Parameters:
+  MyKeyName:
+    Description: Select the key from the list in the console
+    Type: AWS::EC2::KeyPair::KeyName
+  EnvironmentName:
+    Description: Select the env
+    Type: String
+    Default: dev
+    AllowedValues:
+     - dev
+     - prod
+
+Conditions:
+  CreateEIPProd: !Equals [!Ref EnvironmentName, prod]
+  CreateDevSG: !Equals [!Ref EnvironmentName, dev]
+  CreateProdSG: !Equals [!Ref EnvironmentName, prod]
+
+Resources:
+  StackEC2Instance:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      ImageId: !FindInMap
+        - RegionMap
+        - !Ref 'AWS::Region'
+        - HVM64
+      InstanceType: !FindInMap
+        - MyEnvironmentMap
+        - !Ref EnvironmentName
+        - instanceType
+      KeyName: !Ref MyKeyName
+      SecurityGroups: !If [CreateDevSG, [!Ref DevSG], !Ref 'AWS::NoValue']
+        
+  MyProdEIP:
+    Type: AWS::EC2::EIP
+    Condition: CreateEIPProd
+    Properties:
+      InstanceId: !Ref StackEC2Instance
+
+  DevSG:
+    Type: AWS::EC2::SecurityGroup
+    Condition: CreateDevSG
+    Properties:
+      GroupDescription: DevSG creation
+      SecurityGroupIngress:
+       - IpProtocol: tcp
+         FromPort: '22'
+         ToPort: '22'          
+         CidrIp: 0.0.0.0/0    
+
+ProdSG:
+    Type: AWS::EC2::SecurityGroup
+    Condition: CreateDevSG
+    Properties:
+      GroupDescription: DevSG creation
+      SecurityGroupIngress:
+       - IpProtocol: tcp
+         FromPort: '22'
+         ToPort: '22'          
+         CidrIp: 0.0.0.0/0    
